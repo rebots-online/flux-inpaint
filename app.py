@@ -1,4 +1,5 @@
 import torch
+import spaces
 import gradio as gr
 from diffusers import FluxInpaintPipeline
 
