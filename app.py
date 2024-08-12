@@ -34,13 +34,15 @@ def process(input_image_editor, input_text, progress=gr.Progress(track_tqdm=True
         gr.Info("Please draw a mask on the image.")
         return None
 
+    width, height = image.size
+
     return pipe(
         prompt=input_text,
         image=image,
         mask_image=mask_image,
-        width=1024,
-        height=1024,
-        strength=0.9
+        width=width,
+        height=height,
+        strength=0.7
     ).images[0]
 
 
