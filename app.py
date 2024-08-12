@@ -10,16 +10,13 @@ creating this amazing model, and a big thanks to [Gothos](https://github.com/Got
 for taking it to the next level by enabling inpainting with the FLUX.
 """
 
-DEVICE = torch.device("cuda")
-# DEVICE = torch.device("cpu")
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 pipe = FluxInpaintPipeline.from_pretrained(
-    "black-forest-labs/FLUX.1-schnell",
-    torch_dtype=torch.bfloat16)
-pipe.to(DEVICE)
+    "black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16).to(DEVICE)
 
 
-@spaces.GPU()
+@spaces.GPU(duration=200)
 def process(input_image_editor, input_text, progress=gr.Progress(track_tqdm=True)):
     if not input_text:
         gr.Info("Please enter a text prompt.")
