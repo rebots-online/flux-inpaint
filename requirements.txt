@@ -1,0 +1,3 @@
+gradio
+spaces
+git+https://github.com/Gothos/diffusers.git@flux-inpaint
