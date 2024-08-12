@@ -2,4 +2,5 @@ gradio
 spaces
 accelerate
 transformers
+sentencepiece
 git+https://github.com/Gothos/diffusers.git@flux-inpaint
