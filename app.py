@@ -17,7 +17,7 @@ pipe = FluxInpaintPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16).to(DEVICE)
 
 
-@spaces.GPU(duration=200)
+@spaces.GPU()
 def process(input_image_editor, input_text, progress=gr.Progress(track_tqdm=True)):
     if not input_text:
         gr.Info("Please enter a text prompt.")
@@ -54,10 +54,14 @@ with gr.Blocks() as demo:
                 sources=["upload", "webcam"],
                 image_mode='RGB',
                 layers=False,
-                brush=gr.Brush(colors=["#000000"], color_mode="fixed"))
-            input_text_component = gr.Textbox(
-                label='Text prompt',
-                placeholder='Cartoon cactus',)
+                brush=gr.Brush(colors=["#FFFFFF"], color_mode="fixed"))
+            input_text_component = gr.Text(
+                label="Prompt",
+                show_label=False,
+                max_lines=1,
+                placeholder="Enter your prompt",
+                container=False,
+            )
             submit_button_component = gr.Button(
                 value='Submit', variant='primary')
         with gr.Column():
