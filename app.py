@@ -4,6 +4,9 @@ from diffusers import FluxInpaintPipeline
 
 MARKDOWN = """
 # FLUX.1 Inpainting 🔥
+
+Shoutout to the [Black Forest Labs](https://huggingface.co/black-forest-labs) team for 
+creating this amazing model!
 """
 
 DEVICE = torch.device("cuda")
