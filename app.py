@@ -33,7 +33,6 @@ def process(input_image_editor, input_text, progress=gr.Progress(track_tqdm=True
         gr.Info("Please draw a mask on the image.")
         return None
 
-    generator = torch.Generator().manual_seed(42)
     return pipe(
         prompt=input_text,
         image=image,
