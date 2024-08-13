@@ -101,6 +101,7 @@ def process(
     randomize_seed_checkbox: bool,
     strength_slider: float,
     num_inference_steps_slider: int,
+    uploaded_mask: Image.Image,
     progress=gr.Progress(track_tqdm=True)
 ):
     if not input_text:
@@ -108,14 +109,17 @@ def process(
         return None, None
 
     image = input_image_editor['background']
-    mask = input_image_editor['layers'][0]
+    if uploaded_mask is None:
+        mask = input_image_editor['layers'][0]
+    else:
+        mask = uploaded_mask
 
     if not image:
         gr.Info("Please upload an image.")
         return None, None
 
     if not mask:
-        gr.Info("Please draw a mask on the image.")
+        gr.Info("Please draw a mask on the image or upload a mask.")
         return None, None
 
     width, height = resize_image_dimensions(original_resolution_wh=image.size)
@@ -150,6 +154,9 @@ with gr.Blocks() as demo:
                 image_mode='RGB',
                 layers=False,
                 brush=gr.Brush(colors=["#FFFFFF"], color_mode="fixed"))
+
+            with gr.Accordion("Upload a mask", open = False):
+                uploaded_mask_component = gr.Image(label = "Already made mask (white pixels will be preserved, black pixels will be redrawn)", sources = ["upload"], type = "pil")
 
             with gr.Row():
                 input_text_component = gr.Text(
@@ -211,7 +218,8 @@ with gr.Blocks() as demo:
     #             seed_slicer_component,
     #             randomize_seed_checkbox_component,
     #             strength_slider_component,
-    #             num_inference_steps_slider_component
+    #             num_inference_steps_slider_component,
+    #             uploaded_mask_component
     #         ],
     #         outputs=[
     #             output_image_component,
@@ -229,7 +237,8 @@ with gr.Blocks() as demo:
             seed_slicer_component,
             randomize_seed_checkbox_component,
             strength_slider_component,
-            num_inference_steps_slider_component
+            num_inference_steps_slider_component,
+            uploaded_mask_component
         ],
         outputs=[
             output_image_component,
