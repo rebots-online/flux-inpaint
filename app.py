@@ -30,6 +30,11 @@ def resize_image_dimensions(
 ) -> Tuple[int, int]:
     width, height = original_resolution_wh
 
+    if width <= maximum_dimension and height <= maximum_dimension:
+        width = width - (width % 8)
+        height = height - (height % 8)
+        return width, height
+
     if width > height:
         scaling_factor = maximum_dimension / width
     else:
@@ -38,11 +43,8 @@ def resize_image_dimensions(
     new_width = int(width * scaling_factor)
     new_height = int(height * scaling_factor)
 
-    new_width = new_width - (new_width % 32)
-    new_height = new_height - (new_height % 32)
-
-    new_width = min(maximum_dimension, new_width)
-    new_height = min(maximum_dimension, new_height)
+    new_width = new_width - (new_width % 8)
+    new_height = new_height - (new_height % 8)
 
     return new_width, new_height
 
@@ -122,11 +124,11 @@ with gr.Blocks() as demo:
                     minimum=0,
                     maximum=MAX_SEED,
                     step=1,
-                    value=0,
+                    value=42,
                 )
 
                 randomize_seed_checkbox_component = gr.Checkbox(
-                    label="Randomize seed", value=True)
+                    label="Randomize seed", value=False)
 
                 with gr.Row():
                     strength_slider_component = gr.Slider(
