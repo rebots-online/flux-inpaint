@@ -218,7 +218,7 @@ with gr.Blocks() as demo:
                 output_mask_component
             ],
             run_on_click=True,
-            cache_examples=True
+            cache_examples=False
         )
 
     submit_button_component.click(
