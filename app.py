@@ -31,8 +31,8 @@ def resize_image_dimensions(
     width, height = original_resolution_wh
 
     if width <= maximum_dimension and height <= maximum_dimension:
-        width = width - (width % 8)
-        height = height - (height % 8)
+        width = width - (width % 32)
+        height = height - (height % 32)
         return width, height
 
     if width > height:
@@ -43,8 +43,8 @@ def resize_image_dimensions(
     new_width = int(width * scaling_factor)
     new_height = int(height * scaling_factor)
 
-    new_width = new_width - (new_width % 8)
-    new_height = new_height - (new_height % 8)
+    new_width = new_width - (new_width % 32)
+    new_height = new_height - (new_height % 32)
 
     return new_width, new_height
 
