@@ -22,11 +22,26 @@ IMAGE_SIZE = 1024
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
+def remove_background(image: Image.Image, threshold: int = 50) -> Image.Image:
+    image = image.convert("RGBA")
+    data = image.getdata()
+    new_data = []
+    for item in data:
+        avg = sum(item[:3]) / 3
+        if avg < threshold:
+            new_data.append((0, 0, 0, 0))
+        else:
+            new_data.append(item)
+
+    image.putdata(new_data)
+    return image
+
+
 EXAMPLES = [
     [
         {
             "background": Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-image.png", stream=True).raw),
-            "layers": [Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-mask-2.png", stream=True).raw)],
+            "layers": [remove_background(Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-mask-2.png", stream=True).raw))],
             "composite": Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-composite-2.png", stream=True).raw),
         },
         "little lion",
@@ -38,10 +53,10 @@ EXAMPLES = [
     [
         {
             "background": Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-image.png", stream=True).raw),
-            "layers": [Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-mask-3.png", stream=True).raw)],
+            "layers": [remove_background(Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-mask-3.png", stream=True).raw))],
             "composite": Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-composite-3.png", stream=True).raw),
         },
-        "tattoos",
+        "tribal tattoos",
         42,
         False,
         0.85,
@@ -203,7 +218,7 @@ with gr.Blocks() as demo:
                 output_mask_component
             ],
             run_on_click=True,
-            cache_examples=False
+            cache_examples=True
         )
 
     submit_button_component.click(
