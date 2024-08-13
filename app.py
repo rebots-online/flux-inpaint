@@ -201,25 +201,25 @@ with gr.Blocks() as demo:
             with gr.Accordion("Debug", open=False):
                 output_mask_component = gr.Image(
                     type='pil', image_mode='RGB', label='Input mask', format="png")
-    with gr.Row():
-        gr.Examples(
-            fn=process,
-            examples=EXAMPLES,
-            inputs=[
-                input_image_editor_component,
-                input_text_component,
-                seed_slicer_component,
-                randomize_seed_checkbox_component,
-                strength_slider_component,
-                num_inference_steps_slider_component
-            ],
-            outputs=[
-                output_image_component,
-                output_mask_component
-            ],
-            run_on_click=True,
-            cache_examples=False
-        )
+    # with gr.Row():
+    #     gr.Examples(
+    #         fn=process,
+    #         examples=EXAMPLES,
+    #         inputs=[
+    #             input_image_editor_component,
+    #             input_text_component,
+    #             seed_slicer_component,
+    #             randomize_seed_checkbox_component,
+    #             strength_slider_component,
+    #             num_inference_steps_slider_component
+    #         ],
+    #         outputs=[
+    #             output_image_component,
+    #             output_mask_component
+    #         ],
+    #         run_on_click=True,
+    #         cache_examples=False
+    #     )
 
     submit_button_component.click(
         fn=process,
