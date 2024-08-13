@@ -47,7 +47,7 @@ def resize_image_dimensions(
     return new_width, new_height
 
 
-@spaces.GPU()
+@spaces.GPU(duration=150)
 def process(
     input_image_editor: dict,
     input_text: str,
