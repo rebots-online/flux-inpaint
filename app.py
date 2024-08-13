@@ -17,7 +17,7 @@ for taking it to the next level by enabling inpainting with the FLUX.
 """
 
 MAX_SEED = np.iinfo(np.int32).max
-MAX_IMAGE_SIZE = 2048
+IMAGE_SIZE = 1024
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 pipe = FluxInpaintPipeline.from_pretrained(
@@ -26,14 +26,14 @@ pipe = FluxInpaintPipeline.from_pretrained(
 
 def resize_image_dimensions(
     original_resolution_wh: Tuple[int, int],
-    maximum_dimension: int = 2048
+    maximum_dimension: int = IMAGE_SIZE
 ) -> Tuple[int, int]:
     width, height = original_resolution_wh
 
-    if width <= maximum_dimension and height <= maximum_dimension:
-        width = width - (width % 32)
-        height = height - (height % 32)
-        return width, height
+    # if width <= maximum_dimension and height <= maximum_dimension:
+    #     width = width - (width % 32)
+    #     height = height - (height % 32)
+    #     return width, height
 
     if width > height:
         scaling_factor = maximum_dimension / width
@@ -128,19 +128,24 @@ with gr.Blocks() as demo:
                 )
 
                 randomize_seed_checkbox_component = gr.Checkbox(
-                    label="Randomize seed", value=False)
+                    label="Randomize seed", value=True)
 
                 with gr.Row():
                     strength_slider_component = gr.Slider(
                         label="Strength",
+                        info="Indicates extent to transform the reference `image`. "
+                             "Must be between 0 and 1. `image` is used as a starting "
+                             "point and more noise is added the higher the `strength`.",
                         minimum=0,
                         maximum=1,
                         step=0.01,
-                        value=0.75,
+                        value=0.85,
                     )
 
                     num_inference_steps_slider_component = gr.Slider(
                         label="Number of inference steps",
+                        info="The number of denoising steps. More denoising steps "
+                             "usually lead to a higher quality image at the",
                         minimum=1,
                         maximum=50,
                         step=1,
