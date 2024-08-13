@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import requests
 import random
 import numpy as np
 import gradio as gr
@@ -19,6 +20,34 @@ for taking it to the next level by enabling inpainting with the FLUX.
 MAX_SEED = np.iinfo(np.int32).max
 IMAGE_SIZE = 1024
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+EXAMPLES = [
+    [
+        {
+            "background": Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-image.png", stream=True).raw),
+            "layers": [Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-mask-2.png", stream=True).raw)],
+            "composite": Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-composite-2.png", stream=True).raw),
+        },
+        "little lion",
+        42,
+        False,
+        0.85,
+        30
+    ],
+    [
+        {
+            "background": Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-image.png", stream=True).raw),
+            "layers": [Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-mask-3.png", stream=True).raw)],
+            "composite": Image.open(requests.get("https://media.roboflow.com/spaces/doge-2-composite-3.png", stream=True).raw),
+        },
+        "tattoos",
+        42,
+        False,
+        0.85,
+        30
+    ]
+]
 
 pipe = FluxInpaintPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16).to(DEVICE)
@@ -49,7 +78,7 @@ def resize_image_dimensions(
     return new_width, new_height
 
 
-@spaces.GPU(duration=150)
+@spaces.GPU(duration=100)
 def process(
     input_image_editor: dict,
     input_text: str,
@@ -61,22 +90,22 @@ def process(
 ):
     if not input_text:
         gr.Info("Please enter a text prompt.")
-        return None
+        return None, None
 
     image = input_image_editor['background']
     mask = input_image_editor['layers'][0]
 
     if not image:
         gr.Info("Please upload an image.")
-        return None
+        return None, None
 
     if not mask:
         gr.Info("Please draw a mask on the image.")
-        return None
+        return None, None
 
     width, height = resize_image_dimensions(original_resolution_wh=image.size)
     resized_image = image.resize((width, height), Image.LANCZOS)
-    resized_mask = mask.resize((width, height), Image.NEAREST)
+    resized_mask = mask.resize((width, height), Image.LANCZOS)
 
     if randomize_seed_checkbox:
         seed_slicer = random.randint(0, MAX_SEED)
@@ -153,10 +182,29 @@ with gr.Blocks() as demo:
                     )
         with gr.Column():
             output_image_component = gr.Image(
-                type='pil', image_mode='RGB', label='Generated image')
+                type='pil', image_mode='RGB', label='Generated image', format="png")
             with gr.Accordion("Debug", open=False):
                 output_mask_component = gr.Image(
-                    type='pil', image_mode='RGB', label='Input mask')
+                    type='pil', image_mode='RGB', label='Input mask', format="png")
+    with gr.Row():
+        gr.Examples(
+            fn=process,
+            examples=EXAMPLES,
+            inputs=[
+                input_image_editor_component,
+                input_text_component,
+                seed_slicer_component,
+                randomize_seed_checkbox_component,
+                strength_slider_component,
+                num_inference_steps_slider_component
+            ],
+            outputs=[
+                output_image_component,
+                output_mask_component
+            ],
+            run_on_click=True,
+            cache_examples=True
+        )
 
     submit_button_component.click(
         fn=process,
