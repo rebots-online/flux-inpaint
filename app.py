@@ -235,4 +235,4 @@ with gr.Blocks() as demo:
         ]
     )
 
-demo.launch(debug=False, show_error=True)
+demo.launch(debug=True, share=True, server_name='0.0.0.0', show_error=True)
