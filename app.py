@@ -80,33 +80,28 @@ EXAMPLES = [
 # Clear CUDA cache before loading model
 torch.cuda.empty_cache()
 
-# Load model with optimizations
+# Load model components sequentially
 pipe = FluxInpaintPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-schnell",
-    torch_dtype=torch.float16,  # Use float16 instead of bfloat16
+    torch_dtype=torch.float16,
     use_safetensors=True,
-    device_map="sequential",  # Use sequential device mapping
-    low_cpu_mem_usage=True,  # Enable memory efficient loading
-    offload_folder="offload",  # Temporary folder for weight offloading
-    max_memory={0: "8GiB", "cpu": "16GiB"}  # More conservative memory limits
+    low_cpu_mem_usage=True,
 )
 
+# Move components to CPU initially
+pipe.text_encoder.to("cpu")
+pipe.vae.to("cpu")
+pipe.unet.to("cpu")
+torch.cuda.empty_cache()
+
 # Enable memory optimizations
-if ENABLE_ATTENTION_SLICING:
-    pipe.enable_attention_slicing(1)
-if ENABLE_MODEL_CPU_OFFLOAD:
-    pipe.enable_model_cpu_offload()
-if ENABLE_CPU_OFFLOAD:
-    pipe.enable_sequential_cpu_offload()
+pipe.enable_attention_slicing(1)
+pipe.enable_model_cpu_offload()
+pipe.enable_sequential_cpu_offload()
 
 # Enable xformers if available
 if hasattr(pipe, "enable_xformers_memory_efficient_attention"):
     pipe.enable_xformers_memory_efficient_attention()
-
-# Convert any remaining fp32 weights to fp16 and move to GPU
-for name, module in pipe.named_modules():
-    if any(param.dtype == torch.float32 for param in module.parameters()):
-        module.to(torch.float16)
 
 # Use torch.compile for better memory efficiency
 if hasattr(torch, 'compile') and torch.cuda.get_device_capability()[0] >= 7:
