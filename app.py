@@ -8,6 +8,8 @@ import numpy as np
 import gradio as gr
 import torch
 from PIL import Image
+from accelerate import init_empty_weights
+from accelerate.utils import set_module_tensor_to_device
 
 from diffusers import FluxInpaintPipeline
 
@@ -70,12 +72,19 @@ EXAMPLES = [
     ]
 ]
 
+# Clear CUDA cache before loading model
+torch.cuda.empty_cache()
+
 # Load model with optimizations
 pipe = FluxInpaintPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-schnell",
     torch_dtype=torch.float16,  # Use float16 instead of bfloat16
-    use_safetensors=True
-).to(DEVICE)
+    use_safetensors=True,
+    device_map="balanced",  # Use balanced device mapping
+    low_cpu_mem_usage=True,  # Enable memory efficient loading
+    offload_folder="offload",  # Temporary folder for weight offloading
+    max_memory={0: "10GiB"}  # Limit GPU memory usage to 10GB
+)
 
 # Enable memory optimizations
 if ENABLE_ATTENTION_SLICING:
@@ -89,7 +98,12 @@ if ENABLE_CPU_OFFLOAD:
 if hasattr(pipe, "enable_xformers_memory_efficient_attention"):
     pipe.enable_xformers_memory_efficient_attention()
 
-# Clear CUDA cache
+# Convert any remaining fp32 weights to fp16 and move to GPU
+for name, module in pipe.named_modules():
+    if any(param.dtype == torch.float32 for param in module.parameters()):
+        module.to(torch.float16)
+
+# Force CUDA to clean up memory again
 torch.cuda.empty_cache()
 
 def resize_image_dimensions(
