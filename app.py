@@ -20,9 +20,13 @@ for taking it to the next level by enabling inpainting with the FLUX.
 """
 
 MAX_SEED = np.iinfo(np.int32).max
-IMAGE_SIZE = 1024
+IMAGE_SIZE = 768  # Reduced from 1024 to save memory
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+# Memory optimization settings
+ENABLE_CPU_OFFLOAD = True
+ENABLE_ATTENTION_SLICING = True
+ENABLE_MODEL_CPU_OFFLOAD = True
 
 def remove_background(image: Image.Image, threshold: int = 50) -> Image.Image:
     image = image.convert("RGBA")
@@ -66,20 +70,34 @@ EXAMPLES = [
     ]
 ]
 
+# Load model with optimizations
 pipe = FluxInpaintPipeline.from_pretrained(
-    "black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16).to(DEVICE)
+    "black-forest-labs/FLUX.1-schnell",
+    torch_dtype=torch.float16,  # Use float16 instead of bfloat16
+    variant="fp16",
+    use_safetensors=True
+).to(DEVICE)
 
+# Enable memory optimizations
+if ENABLE_ATTENTION_SLICING:
+    pipe.enable_attention_slicing(1)
+if ENABLE_MODEL_CPU_OFFLOAD:
+    pipe.enable_model_cpu_offload()
+if ENABLE_CPU_OFFLOAD:
+    pipe.enable_sequential_cpu_offload()
+
+# Enable xformers if available
+if hasattr(pipe, "enable_xformers_memory_efficient_attention"):
+    pipe.enable_xformers_memory_efficient_attention()
+
+# Clear CUDA cache
+torch.cuda.empty_cache()
 
 def resize_image_dimensions(
     original_resolution_wh: Tuple[int, int],
     maximum_dimension: int = IMAGE_SIZE
 ) -> Tuple[int, int]:
     width, height = original_resolution_wh
-
-    # if width <= maximum_dimension and height <= maximum_dimension:
-    #     width = width - (width % 32)
-    #     height = height - (height % 32)
-    #     return width, height
 
     if width > height:
         scaling_factor = maximum_dimension / width
@@ -123,23 +141,32 @@ def process(
         gr.Info("Please draw a mask on the image.")
         return None, None
 
+    # Clear CUDA cache before processing
+    torch.cuda.empty_cache()
+
     width, height = resize_image_dimensions(original_resolution_wh=image.size)
     resized_image = image.resize((width, height), Image.LANCZOS)
     resized_mask = mask.resize((width, height), Image.LANCZOS)
 
     if randomize_seed_checkbox:
         seed_slicer = random.randint(0, MAX_SEED)
-    generator = torch.Generator().manual_seed(seed_slicer)
-    result = pipe(
-        prompt=input_text,
-        image=resized_image,
-        mask_image=resized_mask,
-        width=width,
-        height=height,
-        strength=strength_slider,
-        generator=generator,
-        num_inference_steps=num_inference_steps_slider
-    ).images[0]
+    generator = torch.Generator(device=DEVICE).manual_seed(seed_slicer)
+    
+    with torch.inference_mode():
+        result = pipe(
+            prompt=input_text,
+            image=resized_image,
+            mask_image=resized_mask,
+            width=width,
+            height=height,
+            strength=strength_slider,
+            generator=generator,
+            num_inference_steps=num_inference_steps_slider
+        ).images[0]
+    
+    # Clear CUDA cache after processing
+    torch.cuda.empty_cache()
+    
     print('INFERENCE DONE')
     return (result, {"name": new_filename}), resized_mask
 
