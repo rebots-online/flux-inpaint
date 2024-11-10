@@ -4,7 +4,6 @@ import requests
 import random
 import numpy as np
 import gradio as gr
-import spaces
 import torch
 from PIL import Image
 from diffusers import FluxInpaintPipeline
@@ -93,7 +92,6 @@ def resize_image_dimensions(
     return new_width, new_height
 
 
-@spaces.GPU(duration=100)
 def process(
     input_image_editor: dict,
     input_text: str,
