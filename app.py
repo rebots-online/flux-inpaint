@@ -1,4 +1,6 @@
 from typing import Tuple
+from datetime import datetime
+import os.path
 
 import requests
 import random
@@ -6,6 +8,7 @@ import numpy as np
 import gradio as gr
 import torch
 from PIL import Image
+
 from diffusers import FluxInpaintPipeline
 
 MARKDOWN = """
@@ -107,6 +110,10 @@ def process(
 
     image = input_image_editor['background']
     mask = input_image_editor['layers'][0]
+    original_filename = input_image_editor.get('name', 'image')
+    base_filename = os.path.splitext(original_filename)[0]
+    date_str = datetime.now().strftime("%d%b%Y").lower()
+    new_filename = f"{base_filename}-inpainted-{date_str}.png"
 
     if not image:
         gr.Info("Please upload an image.")
@@ -134,7 +141,7 @@ def process(
         num_inference_steps=num_inference_steps_slider
     ).images[0]
     print('INFERENCE DONE')
-    return result, resized_mask
+    return (result, {"name": new_filename}), resized_mask
 
 
 with gr.Blocks() as demo:
@@ -236,3 +243,4 @@ with gr.Blocks() as demo:
     )
 
 demo.launch(debug=True, share=True, server_name='0.0.0.0', show_error=True)
+
