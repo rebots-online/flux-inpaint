@@ -29,6 +29,11 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 ENABLE_CPU_OFFLOAD = True
 ENABLE_ATTENTION_SLICING = True
 ENABLE_MODEL_CPU_OFFLOAD = True
+ENABLE_SEQUENTIAL_LOADING = True  # Added sequential loading
+
+# Set PyTorch memory allocator settings
+torch.cuda.set_per_process_memory_fraction(0.85)  # Use only 85% of available VRAM
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 def remove_background(image: Image.Image, threshold: int = 50) -> Image.Image:
     image = image.convert("RGBA")
@@ -80,10 +85,10 @@ pipe = FluxInpaintPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-schnell",
     torch_dtype=torch.float16,  # Use float16 instead of bfloat16
     use_safetensors=True,
-    device_map="balanced",  # Use balanced device mapping
+    device_map="sequential",  # Use sequential device mapping
     low_cpu_mem_usage=True,  # Enable memory efficient loading
     offload_folder="offload",  # Temporary folder for weight offloading
-    max_memory={0: "10GiB", "cpu": "16GiB"}  # Limit GPU and CPU memory usage
+    max_memory={0: "8GiB", "cpu": "16GiB"}  # More conservative memory limits
 )
 
 # Enable memory optimizations
