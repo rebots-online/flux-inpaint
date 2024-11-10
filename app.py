@@ -80,33 +80,29 @@ EXAMPLES = [
 # Clear CUDA cache before loading model
 torch.cuda.empty_cache()
 
-# Load model components sequentially
+# Set PyTorch memory allocator settings
+torch.cuda.set_per_process_memory_fraction(0.85)
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+# Load model components sequentially with minimal settings
 pipe = FluxInpaintPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-schnell",
     torch_dtype=torch.float16,
     use_safetensors=True,
+    device_map=None,  # Don't automatically map devices
     low_cpu_mem_usage=True,
 )
 
-# Move components to CPU initially
-pipe.text_encoder.to("cpu")
-pipe.vae.to("cpu")
-pipe.unet.to("cpu")
+# Move everything to CPU initially
+pipe.to("cpu")
 torch.cuda.empty_cache()
 
-# Enable memory optimizations
+# Enable basic memory optimizations
 pipe.enable_attention_slicing(1)
-pipe.enable_model_cpu_offload()
-pipe.enable_sequential_cpu_offload()
 
 # Enable xformers if available
 if hasattr(pipe, "enable_xformers_memory_efficient_attention"):
     pipe.enable_xformers_memory_efficient_attention()
-
-# Use torch.compile for better memory efficiency
-if hasattr(torch, 'compile') and torch.cuda.get_device_capability()[0] >= 7:
-    pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
-    pipe.vae = torch.compile(pipe.vae, mode="reduce-overhead", fullgraph=True)
 
 # Force CUDA to clean up memory again
 torch.cuda.empty_cache()
