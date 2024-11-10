@@ -1,4 +1,6 @@
 from typing import Tuple
+from datetime import datetime
+import os.path
 
 import requests
 import random
@@ -6,6 +8,9 @@ import numpy as np
 import gradio as gr
 import torch
 from PIL import Image
+from accelerate import init_empty_weights
+from accelerate.utils import set_module_tensor_to_device
+
 from diffusers import FluxInpaintPipeline
 
 MARKDOWN = """
@@ -17,9 +22,18 @@ for taking it to the next level by enabling inpainting with the FLUX.
 """
 
 MAX_SEED = np.iinfo(np.int32).max
-IMAGE_SIZE = 1024
+IMAGE_SIZE = 768  # Reduced from 1024 to save memory
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+# Memory optimization settings
+ENABLE_CPU_OFFLOAD = True
+ENABLE_ATTENTION_SLICING = True
+ENABLE_MODEL_CPU_OFFLOAD = True
+ENABLE_SEQUENTIAL_LOADING = True  # Added sequential loading
+
+# Set PyTorch memory allocator settings
+torch.cuda.set_per_process_memory_fraction(0.85)  # Use only 85% of available VRAM
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 def remove_background(image: Image.Image, threshold: int = 50) -> Image.Image:
     image = image.convert("RGBA")
@@ -63,20 +77,41 @@ EXAMPLES = [
     ]
 ]
 
-pipe = FluxInpaintPipeline.from_pretrained(
-    "black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16).to(DEVICE)
+# Clear CUDA cache before loading model
+torch.cuda.empty_cache()
 
+# Set PyTorch memory allocator settings
+torch.cuda.set_per_process_memory_fraction(0.85)
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
+# Load model components sequentially with minimal settings
+pipe = FluxInpaintPipeline.from_pretrained(
+    "black-forest-labs/FLUX.1-schnell",
+    torch_dtype=torch.float16,
+    use_safetensors=True,
+    device_map=None,  # Don't automatically map devices
+    low_cpu_mem_usage=True,
+)
+
+# Move everything to CPU initially
+pipe.to("cpu")
+torch.cuda.empty_cache()
+
+# Enable basic memory optimizations
+pipe.enable_attention_slicing(1)
+
+# Enable xformers if available
+if hasattr(pipe, "enable_xformers_memory_efficient_attention"):
+    pipe.enable_xformers_memory_efficient_attention()
+
+# Force CUDA to clean up memory again
+torch.cuda.empty_cache()
 
 def resize_image_dimensions(
     original_resolution_wh: Tuple[int, int],
     maximum_dimension: int = IMAGE_SIZE
 ) -> Tuple[int, int]:
     width, height = original_resolution_wh
-
-    # if width <= maximum_dimension and height <= maximum_dimension:
-    #     width = width - (width % 32)
-    #     height = height - (height % 32)
-    #     return width, height
 
     if width > height:
         scaling_factor = maximum_dimension / width
@@ -107,6 +142,10 @@ def process(
 
     image = input_image_editor['background']
     mask = input_image_editor['layers'][0]
+    original_filename = input_image_editor.get('name', 'image')
+    base_filename = os.path.splitext(original_filename)[0]
+    date_str = datetime.now().strftime("%d%b%Y").lower()
+    new_filename = f"{base_filename}-inpainted-{date_str}.png"
 
     if not image:
         gr.Info("Please upload an image.")
@@ -116,25 +155,41 @@ def process(
         gr.Info("Please draw a mask on the image.")
         return None, None
 
+    # Clear CUDA cache before processing
+    torch.cuda.empty_cache()
+
     width, height = resize_image_dimensions(original_resolution_wh=image.size)
     resized_image = image.resize((width, height), Image.LANCZOS)
     resized_mask = mask.resize((width, height), Image.LANCZOS)
 
     if randomize_seed_checkbox:
         seed_slicer = random.randint(0, MAX_SEED)
-    generator = torch.Generator().manual_seed(seed_slicer)
-    result = pipe(
-        prompt=input_text,
-        image=resized_image,
-        mask_image=resized_mask,
-        width=width,
-        height=height,
-        strength=strength_slider,
-        generator=generator,
-        num_inference_steps=num_inference_steps_slider
-    ).images[0]
+    generator = torch.Generator(device=DEVICE).manual_seed(seed_slicer)
+    
+    try:
+        # Move required components to GPU just before inference
+        pipe.text_encoder.to(DEVICE)
+        pipe.unet.to(DEVICE)
+        
+        with torch.inference_mode(), torch.autocast(DEVICE):
+            result = pipe(
+                prompt=input_text,
+                image=resized_image,
+                mask_image=resized_mask,
+                width=width,
+                height=height,
+                strength=strength_slider,
+                generator=generator,
+                num_inference_steps=num_inference_steps_slider
+            ).images[0]
+    finally:
+        # Move components back to CPU after inference
+        pipe.text_encoder.to("cpu")
+        pipe.unet.to("cpu")
+        torch.cuda.empty_cache()
+    
     print('INFERENCE DONE')
-    return result, resized_mask
+    return (result, {"name": new_filename}), resized_mask
 
 
 with gr.Blocks() as demo:
@@ -236,3 +291,4 @@ with gr.Blocks() as demo:
     )
 
 demo.launch(debug=True, share=True, server_name='0.0.0.0', show_error=True)
+
