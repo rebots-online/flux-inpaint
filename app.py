@@ -83,7 +83,7 @@ pipe = FluxInpaintPipeline.from_pretrained(
     device_map="balanced",  # Use balanced device mapping
     low_cpu_mem_usage=True,  # Enable memory efficient loading
     offload_folder="offload",  # Temporary folder for weight offloading
-    max_memory={0: "10GiB"}  # Limit GPU memory usage to 10GB
+    max_memory={0: "10GiB", "cpu": "16GiB"}  # Limit GPU and CPU memory usage
 )
 
 # Enable memory optimizations
@@ -102,6 +102,11 @@ if hasattr(pipe, "enable_xformers_memory_efficient_attention"):
 for name, module in pipe.named_modules():
     if any(param.dtype == torch.float32 for param in module.parameters()):
         module.to(torch.float16)
+
+# Use torch.compile for better memory efficiency
+if hasattr(torch, 'compile') and torch.cuda.get_device_capability()[0] >= 7:
+    pipe.unet = torch.compile(pipe.unet, mode="reduce-overhead", fullgraph=True)
+    pipe.vae = torch.compile(pipe.vae, mode="reduce-overhead", fullgraph=True)
 
 # Force CUDA to clean up memory again
 torch.cuda.empty_cache()
