@@ -74,7 +74,6 @@ EXAMPLES = [
 pipe = FluxInpaintPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-schnell",
     torch_dtype=torch.float16,  # Use float16 instead of bfloat16
-    variant="fp16",
     use_safetensors=True
 ).to(DEVICE)
 
