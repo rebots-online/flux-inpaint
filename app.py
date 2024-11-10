@@ -170,20 +170,27 @@ def process(
         seed_slicer = random.randint(0, MAX_SEED)
     generator = torch.Generator(device=DEVICE).manual_seed(seed_slicer)
     
-    with torch.inference_mode():
-        result = pipe(
-            prompt=input_text,
-            image=resized_image,
-            mask_image=resized_mask,
-            width=width,
-            height=height,
-            strength=strength_slider,
-            generator=generator,
-            num_inference_steps=num_inference_steps_slider
-        ).images[0]
-    
-    # Clear CUDA cache after processing
-    torch.cuda.empty_cache()
+    try:
+        # Move required components to GPU just before inference
+        pipe.text_encoder.to(DEVICE)
+        pipe.unet.to(DEVICE)
+        
+        with torch.inference_mode(), torch.autocast(DEVICE):
+            result = pipe(
+                prompt=input_text,
+                image=resized_image,
+                mask_image=resized_mask,
+                width=width,
+                height=height,
+                strength=strength_slider,
+                generator=generator,
+                num_inference_steps=num_inference_steps_slider
+            ).images[0]
+    finally:
+        # Move components back to CPU after inference
+        pipe.text_encoder.to("cpu")
+        pipe.unet.to("cpu")
+        torch.cuda.empty_cache()
     
     print('INFERENCE DONE')
     return (result, {"name": new_filename}), resized_mask
